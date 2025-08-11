@@ -1,0 +1,42 @@
+name: pdf_signer_extra
+description: "This app design for signing pdf easily."
+
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  #base
+  file_picker: ^10.2.2
+  printing: ^5.14.2
+  signature: ^6.3.0
+  syncfusion_flutter_pdf: ^30.2.4
+
+  #for fun
+  google_fonts: ^6.2.1
+  loading_animation_widget: ^1.2.1
+
+  #riverpod
+  flutter_riverpod: ^2.5.1
+  hive: ^2.2.3
+  hive_flutter: ^1.1.0
+  ftpconnect: ^2.0.7
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+  riverpod_generator: ^2.3.3
+  build_runner: ^2.4.8
+
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/sample.pdf
