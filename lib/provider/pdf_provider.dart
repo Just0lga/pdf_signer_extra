@@ -1,12 +1,10 @@
+import 'dart:typed_data';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:pdf_signer_extra/models/pdf_state.dart';
-import 'package:pdf_signer_extra/services/pdf_loader_service.dart';
 import 'package:printing/printing.dart';
 import 'package:syncfusion_flutter_pdf/pdf.dart' as sf;
-
-import 'package:flutter/services.dart';
-
-// providers/pdf_provider.dart
+import '../models/pdf_state.dart';
+import '../services/pdf_loader_service.dart';
 
 final pdfProvider = StateNotifierProvider<PdfNotifier, PdfState>(
   (ref) => PdfNotifier(),
@@ -52,13 +50,11 @@ class PdfNotifier extends StateNotifier<PdfState> {
   Future<Uint8List?> renderPage(int pageIndex) async {
     if (state.pdfBytes == null) return null;
 
-    // Cache'den kontrol et
     if (state.renderedImages.containsKey(pageIndex)) {
       return state.renderedImages[pageIndex];
     }
 
     try {
-      // PDF sayfasını render et
       await for (final page in Printing.raster(
         state.pdfBytes!,
         pages: [pageIndex],
@@ -66,13 +62,10 @@ class PdfNotifier extends StateNotifier<PdfState> {
       )) {
         final image = await page.toPng();
 
-        // Cache'e ekle - build dışında güncelle
         Future.delayed(Duration.zero, () {
-          if (mounted) {
-            state = state.copyWith(
-              renderedImages: {...state.renderedImages, pageIndex: image},
-            );
-          }
+          state = state.copyWith(
+            renderedImages: {...state.renderedImages, pageIndex: image},
+          );
         });
 
         return image;

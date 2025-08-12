@@ -1,8 +1,5 @@
-// models/pdf_state.dart
-
 import 'dart:typed_data';
-import 'dart:ui';
-
+import 'package:flutter/material.dart';
 import 'package:syncfusion_flutter_pdf/pdf.dart' as sf;
 
 class PdfState {
@@ -35,8 +32,8 @@ class PdfState {
     bool? Function()? documentClear,
   }) =>
       PdfState(
-        document: (documentClear != null && documentClear() == true)
-            ? null
+        document: documentClear != null
+            ? (documentClear != null ? null : document)
             : (document ?? this.document),
         signatures: signatures ?? this.signatures,
         totalPages: totalPages ?? this.totalPages,

@@ -1,14 +1,12 @@
-// main.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pdf_signer_extra/models/pdf_state.dart';
-import 'package:pdf_signer_extra/provider/pdf_notifier.dart';
+import 'package:pdf_signer_extra/provider/pdf_provider.dart';
 import 'package:pdf_signer_extra/widgets/loader_button.dart';
-import 'package:pdf_signer_extra/widgets/pdf_page_widget.dart';
-import 'package:pdf_signer_extra/widgets/signature_dialog.dart';
 import 'package:printing/printing.dart';
-
-// screens/pdf_imza_screen.dart
+import '../services/ftp_pdf_loader.dart';
+import '../widgets/pdf_page_widget.dart';
+import '../widgets/signature_dialog.dart';
 
 class PdfImzaScreen extends ConsumerWidget {
   @override
@@ -18,11 +16,8 @@ class PdfImzaScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('PDF İmzala'),
+        title: const Text('PDF İmza Uygulaması'),
         centerTitle: true,
-        backgroundColor: Colors.black,
-        titleTextStyle: TextStyle(color: Colors.white, fontSize: 20),
-        iconTheme: IconThemeData(color: Colors.white),
         actions: _buildActions(context, pdfState, pdfNotifier),
         leading: _buildLeading(context, pdfState, pdfNotifier),
       ),
@@ -131,14 +126,20 @@ class PdfImzaScreen extends ConsumerWidget {
   Future<void> _savePDF(BuildContext context, PdfNotifier notifier) async {
     try {
       final signedPdfBytes = await notifier.createSignedPDF();
-      await Printing.layoutPdf(
-        onLayout: (_) async => signedPdfBytes,
-        name: 'signed_document.pdf',
+
+      // FTP'ye yükle
+      final fileName = 'signed_${DateTime.now().millisecondsSinceEpoch}.pdf';
+      await FtpPdfLoader.uploadPdfToFtp(
+        host: '10.0.2.2',
+        username: 'tolga',
+        password: '1234',
+        pdfBytes: signedPdfBytes,
+        fileName: fileName,
       );
 
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('PDF başarıyla kaydedildi')),
+          const SnackBar(content: Text('PDF kaydedildi ve FTP\'ye yüklendi')),
         );
       }
     } catch (e) {

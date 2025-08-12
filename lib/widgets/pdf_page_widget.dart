@@ -1,11 +1,8 @@
-// widgets/pdf_page_widget.dart
-
 import 'dart:typed_data';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pdf_signer_extra/models/pdf_state.dart';
-import 'package:pdf_signer_extra/provider/pdf_notifier.dart';
+import 'package:pdf_signer_extra/provider/pdf_provider.dart';
 
 class PdfPageWidget extends ConsumerStatefulWidget {
   final int pageIndex;
@@ -27,7 +24,6 @@ class _PdfPageWidgetState extends ConsumerState<PdfPageWidget> {
   @override
   void initState() {
     super.initState();
-    // Init'de future'ı bir kez oluştur
     _renderFuture = ref.read(pdfProvider.notifier).renderPage(widget.pageIndex);
   }
 

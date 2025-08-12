@@ -1,8 +1,6 @@
-// widgets/signature_dialog.dart
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:pdf_signer_extra/provider/pdf_notifier.dart';
+import 'package:pdf_signer_extra/provider/pdf_provider.dart';
 import 'package:signature/signature.dart';
 
 class SignatureDialog extends ConsumerStatefulWidget {

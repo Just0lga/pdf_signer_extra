@@ -1,11 +1,8 @@
-// services/local_pdf_loader.dart
-
 import 'dart:io';
 import 'dart:typed_data';
-
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
-import 'package:pdf_signer_extra/services/pdf_loader_service.dart';
+import 'pdf_loader_service.dart';
 
 class LocalPdfLoader implements PdfLoaderService {
   @override
