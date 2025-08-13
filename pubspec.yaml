@@ -16,11 +16,11 @@ dependencies:
   printing: ^5.14.2
   signature: ^6.3.0
   syncfusion_flutter_pdf: ^30.2.4
-
+  intl: ^0.19.0
   #for fun
   google_fonts: ^6.2.1
   loading_animation_widget: ^1.2.1
-
+  charset_converter: ^2.1.1
   #riverpod
   flutter_riverpod: ^2.5.1
   hive: ^2.2.3

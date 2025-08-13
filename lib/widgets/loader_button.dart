@@ -14,6 +14,7 @@ class LoaderButtons extends ConsumerWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
+          /*
           _buildButton(
             icon: Icons.upload_file,
             label: 'Lokalden PDF Yükle',
@@ -25,8 +26,7 @@ class LoaderButtons extends ConsumerWidget {
             label: 'Asset\'ten PDF Yükle',
             onPressed: () =>
                 notifier.loadPdf(AssetPdfLoader('assets/sample.pdf')),
-          ),
-          const SizedBox(height: 16),
+          ),*/
           _buildButton(
             icon: Icons.cloud_download,
             label: 'FTP\'den PDF Yükle',
@@ -45,13 +45,34 @@ class LoaderButtons extends ConsumerWidget {
     required String label,
     required VoidCallback onPressed,
   }) =>
-      ElevatedButton.icon(
-        onPressed: onPressed,
-        icon: Icon(icon),
-        label: Text(label),
-        style: ElevatedButton.styleFrom(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-          minimumSize: const Size(250, 50),
-        ),
-      );
+      GestureDetector(
+          onTap: onPressed,
+          child: Container(
+            margin: EdgeInsets.all(8),
+            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            decoration: BoxDecoration(
+              color: Colors.blue,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  label,
+                  style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 24,
+                      color: Colors.white),
+                ),
+                SizedBox(
+                  width: 16,
+                ),
+                Icon(
+                  icon,
+                  color: Colors.white,
+                  size: 32,
+                )
+              ],
+            ),
+          ));
 }

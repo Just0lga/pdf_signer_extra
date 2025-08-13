@@ -3,9 +3,9 @@ import '../services/ftp_pdf_loader.dart';
 import '../models/ftp_file.dart';
 
 final ftpConfigProvider = StateProvider<FtpConfig>((ref) => FtpConfig(
-      host: 'ftp.dlptest.com',
-      username: 'dlpuser',
-      password: 'rNrKYTX9g7z3RgJRmxWuGHbeu',
+      host: '192.168.137.253',
+      username: 'tolga',
+      password: '1234',
       directory: '/',
       port: 21,
     ));

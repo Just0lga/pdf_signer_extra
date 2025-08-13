@@ -27,6 +27,32 @@ class _PdfPageWidgetState extends ConsumerState<PdfPageWidget> {
     _renderFuture = ref.read(pdfProvider.notifier).renderPage(widget.pageIndex);
   }
 
+  Color getSignatureBoxColor(int pageIndex, int signatureIndex) {
+    final pdfState = ref.watch(pdfProvider);
+    final pdfNotifier = ref.read(pdfProvider.notifier);
+
+    // Şu anda dolu imza varsa yeşil (PDF esnasında atılmış)
+    final key = '${pageIndex}_$signatureIndex';
+    if (pdfState.signatures.containsKey(key) &&
+        pdfState.signatures[key] != null) {
+      return Colors.green.withOpacity(0.4) ?? Colors.green.withOpacity(0.4);
+    }
+
+    // Dosyadan mevcut imzaları al
+    final existingSignatures = pdfNotifier.getExistingSignatureIndexes();
+
+    // 1-based index (signatureIndex 0-based olduğu için +1)
+    final currentSignatureNumber = signatureIndex + 1;
+
+    // Önceden imzalanmış kutularsa sarı
+    if (existingSignatures.contains(currentSignatureNumber)) {
+      return Colors.green.withOpacity(0.4) ?? Colors.green.withOpacity(0.4);
+    }
+
+    // Boş kutular kırmızı
+    return Colors.red.withOpacity(0.6) ?? Colors.red.withOpacity(0.6);
+  }
+
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(pdfProvider);
@@ -76,7 +102,10 @@ class _PdfPageWidgetState extends ConsumerState<PdfPageWidget> {
   Widget _buildLoadingContent(PdfState state) {
     final pageSize = state.pageSizes[widget.pageIndex];
     if (pageSize == null)
-      return const Center(child: CircularProgressIndicator());
+      return const Center(
+          child: CircularProgressIndicator(
+        color: Colors.blue,
+      ));
 
     return FittedBox(
       fit: BoxFit.contain,
@@ -84,7 +113,9 @@ class _PdfPageWidgetState extends ConsumerState<PdfPageWidget> {
         width: pageSize.width,
         height: pageSize.height,
         alignment: Alignment.center,
-        child: const CircularProgressIndicator(),
+        child: const CircularProgressIndicator(
+          color: Colors.blue,
+        ),
       ),
     );
   }
@@ -125,9 +156,9 @@ class _PdfPageWidgetState extends ConsumerState<PdfPageWidget> {
     if (pageSize == null) return const SizedBox();
 
     return Positioned(
-      bottom: 20,
-      left: 20,
-      right: 20,
+      bottom: 0,
+      left: 5,
+      right: 5,
       child: Container(
         color: Colors.transparent,
         padding: const EdgeInsets.symmetric(vertical: 10),
@@ -155,17 +186,27 @@ class _PdfPageWidgetState extends ConsumerState<PdfPageWidget> {
 
   Widget _buildSignatureBox(
       String key, bool hasSignature, int index, PdfState state, Size pageSize) {
+    // Kutu rengini al
+    final boxColor = getSignatureBoxColor(widget.pageIndex, index);
+    final pdfNotifier = ref.read(pdfProvider.notifier);
+
+    final existingSignatures = pdfNotifier.getExistingSignatureIndexes();
+
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 2),
+      margin: const EdgeInsets.symmetric(horizontal: 1),
       height: pageSize.height * 0.05,
       width: pageSize.width * 0.2,
       decoration: BoxDecoration(
         border: Border.all(
-          color: hasSignature ? Colors.green : Colors.red,
+          color: Colors.black.withOpacity(0.2),
+          /*hasSignature
+              ? Colors.green.withOpacity(0.7)
+              : Colors.red.withOpacity(0.7),*/
           width: 2,
         ),
-        color:
-            state.isLoading ? Colors.grey.withOpacity(0.3) : Colors.transparent,
+        color: state.isLoading
+            ? Colors.grey.withOpacity(0.3)
+            : boxColor, // Dinamik renk
       ),
       child: hasSignature
           ? Padding(
@@ -176,14 +217,19 @@ class _PdfPageWidgetState extends ConsumerState<PdfPageWidget> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.edit,
-                      size: 16,
-                      color: state.isLoading ? Colors.grey : Colors.red),
+                  existingSignatures.contains(index + 1)
+                      ? SizedBox()
+                      : Icon(Icons.edit,
+                          size: 16,
+                          color: state.isLoading ? Colors.grey : Colors.black),
                   Text(
-                    'İmza ${index + 1}',
+                    existingSignatures.contains(index + 1)
+                        ? ""
+                        : 'İmza ${index + 1}',
                     style: TextStyle(
                         fontSize: 9,
-                        color: state.isLoading ? Colors.grey : Colors.red),
+                        color: state.isLoading ? Colors.grey : Colors.black,
+                        fontWeight: FontWeight.bold),
                   ),
                 ],
               ),

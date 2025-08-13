@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pdf_signer_extra/models/pdf_state.dart';
@@ -16,7 +18,10 @@ class PdfImzaScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('PDF İmza Uygulaması'),
+        title: const Text('PDF İmzala',
+            style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+        backgroundColor: Colors.blue,
+        iconTheme: IconThemeData(color: Colors.white),
         centerTitle: true,
         actions: _buildActions(context, pdfState, pdfNotifier),
         leading: _buildLeading(context, pdfState, pdfNotifier),
@@ -59,7 +64,7 @@ class PdfImzaScreen extends ConsumerWidget {
                 Navigator.pop(context);
               }
             },
-      icon: const Icon(Icons.arrow_back_ios_new),
+      icon: const Icon(Icons.arrow_back),
     );
   }
 
@@ -95,7 +100,7 @@ class PdfImzaScreen extends ConsumerWidget {
             height: 20,
             child: CircularProgressIndicator(
               strokeWidth: 2,
-              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+              valueColor: AlwaysStoppedAnimation<Color>(Colors.blue),
             ),
           ),
         ),
@@ -105,7 +110,7 @@ class PdfImzaScreen extends ConsumerWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            CircularProgressIndicator(),
+            CircularProgressIndicator(color: Colors.blue),
             SizedBox(height: 16),
             Text('İşlem yapılıyor...'),
           ],
@@ -124,28 +129,117 @@ class PdfImzaScreen extends ConsumerWidget {
   }
 
   Future<void> _savePDF(BuildContext context, PdfNotifier notifier) async {
+    // Loading göster
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const AlertDialog(
+        content: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CircularProgressIndicator(color: Colors.blue),
+            SizedBox(width: 16),
+            Text('PDF kaydediliyor...'),
+          ],
+        ),
+      ),
+    );
+
     try {
-      final signedPdfBytes = await notifier.createSignedPDF();
+      final result = await notifier.createSignedPDF();
+      final Uint8List signedPdfBytes = result['bytes'];
+      final String fileName = '${result['fileName']}.pdf';
+
+      // Dosya var mı kontrol et
+      final existingFiles = await FtpPdfLoader.listPdfFiles(
+        host: '192.168.137.253',
+        username: 'tolga',
+        password: '1234',
+      );
+
+      final fileExists = existingFiles.any((file) => file.name == fileName);
+      bool shouldOverwrite = true;
+
+      // Loading'i kapat
+      if (context.mounted) Navigator.pop(context);
+
+      // Eğer dosya varsa kullanıcıya sor
+      if (fileExists && context.mounted) {
+        shouldOverwrite = await showDialog<bool>(
+              context: context,
+              builder: (context) => AlertDialog(
+                title: const Text('Dosya Mevcut'),
+                content: Text(
+                    '$fileName zaten mevcut. Üstüne yazmak istiyor musunuz?'),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context, false),
+                    child: const Text('İptal'),
+                  ),
+                  TextButton(
+                    onPressed: () => Navigator.pop(context, true),
+                    child: const Text('Üstüne Yaz'),
+                  ),
+                ],
+              ),
+            ) ??
+            false;
+      }
+
+      if (!shouldOverwrite) return;
+
+      // Upload loading göster
+      if (context.mounted) {
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => const AlertDialog(
+            content: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CircularProgressIndicator(color: Colors.blue),
+                SizedBox(width: 16),
+                Text('FTP\'ye yükleniyor...'),
+              ],
+            ),
+          ),
+        );
+      }
 
       // FTP'ye yükle
-      final fileName = 'signed_${DateTime.now().millisecondsSinceEpoch}.pdf';
-      await FtpPdfLoader.uploadPdfToFtp(
-        host: '10.0.2.2',
+      final success = await FtpPdfLoader.uploadPdfToFtp(
+        host: '192.168.137.253',
         username: 'tolga',
         password: '1234',
         pdfBytes: signedPdfBytes,
         fileName: fileName,
+        overwrite: shouldOverwrite,
       );
 
+      // Loading'i kapat
+      if (context.mounted) Navigator.pop(context);
+
+      // Sonuç göster
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('PDF kaydedildi ve FTP\'ye yüklendi')),
+          SnackBar(
+            content: Text(success
+                ? 'PDF kaydedildi: $fileName'
+                : 'PDF kaydetme başarısız!'),
+            backgroundColor: success ? Colors.green : Colors.red,
+          ),
         );
       }
     } catch (e) {
+      // Loading'i kapat
+      if (context.mounted) Navigator.pop(context);
+
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('PDF kaydetme hatası: $e')),
+          SnackBar(
+            content: Text('PDF kaydetme hatası: $e'),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     }
@@ -153,10 +247,16 @@ class PdfImzaScreen extends ConsumerWidget {
 
   Future<void> _sharePDF(BuildContext context, PdfNotifier notifier) async {
     try {
-      final signedPdfBytes = await notifier.createSignedPDF();
+      // Map döndüren createSignedPDF'yi çağır
+      final Map<String, dynamic> result = await notifier.createSignedPDF();
+
+      // Map'ten bytes ve fileName'i çıkar
+      final Uint8List signedPdfBytes = result['bytes'];
+      final String fileName = result['fileName'];
+
       await Printing.sharePdf(
-        bytes: signedPdfBytes,
-        filename: 'signed_document.pdf',
+        bytes: signedPdfBytes, // Artık doğru tip: Uint8List
+        filename: '$fileName.pdf', // Dinamik dosya adı
       );
     } catch (e) {
       if (context.mounted) {

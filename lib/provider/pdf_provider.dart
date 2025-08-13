@@ -13,7 +13,7 @@ final pdfProvider = StateNotifierProvider<PdfNotifier, PdfState>(
 class PdfNotifier extends StateNotifier<PdfState> {
   PdfNotifier() : super(const PdfState());
 
-  Future<void> loadPdf(PdfLoaderService loader) async {
+  Future<void> loadPdf(PdfLoaderService loader, {String? fileName}) async {
     state = state.copyWith(isLoading: true);
 
     try {
@@ -32,6 +32,14 @@ class PdfNotifier extends StateNotifier<PdfState> {
         pageSizes[i] = Size(pageSize.width, pageSize.height);
       }
 
+      // Dosya adını temizle (.pdf uzantısını kaldır)
+      String? cleanFileName;
+      if (fileName != null) {
+        cleanFileName = fileName.toLowerCase().endsWith('.pdf')
+            ? fileName.substring(0, fileName.length - 4)
+            : fileName;
+      }
+
       state = PdfState(
         pdfBytes: bytes,
         document: document,
@@ -39,6 +47,7 @@ class PdfNotifier extends StateNotifier<PdfState> {
         pageSizes: pageSizes,
         signatures: {},
         renderedImages: {},
+        pdfName: cleanFileName, // pdfName alanını kullan
       );
     } catch (e) {
       print('PDF yükleme hatası: $e');
@@ -94,7 +103,7 @@ class PdfNotifier extends StateNotifier<PdfState> {
     state = const PdfState();
   }
 
-  Future<Uint8List> createSignedPDF() async {
+  Future<Map<String, dynamic>> createSignedPDF() async {
     if (state.pdfBytes == null || state.document == null) {
       throw Exception('PDF yüklenmemiş');
     }
@@ -136,7 +145,12 @@ class PdfNotifier extends StateNotifier<PdfState> {
       }
 
       final bytes = await document.save();
-      return Uint8List.fromList(bytes);
+      final fileName = finalName(); // Parametresiz çağır
+
+      return {
+        'bytes': Uint8List.fromList(bytes),
+        'fileName': fileName,
+      };
     } finally {
       document.dispose();
     }
@@ -155,5 +169,84 @@ class PdfNotifier extends StateNotifier<PdfState> {
       bounds: Rect.fromLTWH(x + 5, y + height / 2 - 5, width - 10, 20),
       brush: sf.PdfSolidBrush(sf.PdfColor(255, 0, 0)),
     );
+  }
+
+  String finalName() {
+    // PdfState'teki pdfName alanını kullan
+    String baseName = state.pdfName ?? 'document';
+
+    // Mevcut imzalanmış indexleri al (dosya adından)
+    final Set<int> existingIndexes = <int>{};
+
+    // Eğer dosya adında "_imzalandı_" varsa, mevcut imzaları çıkar
+    if (baseName.contains('_imzalandi_')) {
+      final index = baseName.indexOf('_imzalandi_');
+      final originalName = baseName.substring(0, index);
+      final indexPart = baseName.substring(index + '_imzalandi_'.length);
+
+      // Mevcut indexleri parse et (örn: "14" → [1, 4])
+      for (int i = 0; i < indexPart.length; i++) {
+        final digit = int.tryParse(indexPart[i]);
+        if (digit != null && digit >= 1 && digit <= 4) {
+          existingIndexes.add(digit);
+        }
+      }
+
+      baseName = originalName; // Orijinal dosya adını al
+    }
+
+    // Şu anda aktif olan imzaları al
+    final Set<int> currentSignatureIndexes = <int>{};
+
+    for (final key in state.signatures.keys) {
+      if (state.signatures[key] != null) {
+        // Sadece dolu imzaları say
+        final parts = key.split('_');
+        if (parts.length == 2) {
+          final signatureIndex = int.tryParse(parts[1]);
+          if (signatureIndex != null) {
+            currentSignatureIndexes
+                .add(signatureIndex + 1); // 0-based'den 1-based'e çevir
+          }
+        }
+      }
+    }
+
+    // Mevcut ve yeni imzaları birleştir
+    final Set<int> allSignatureIndexes = <int>{};
+    allSignatureIndexes.addAll(existingIndexes);
+    allSignatureIndexes.addAll(currentSignatureIndexes);
+
+    // Hiç imza yoksa unsigned
+    if (allSignatureIndexes.isEmpty) {
+      return '${baseName}';
+    }
+
+    // Sırala ve string'e çevir
+    final sortedIndexes = allSignatureIndexes.toList()..sort();
+    final indexString = sortedIndexes.join('');
+
+    return '${baseName}_imzalandi_$indexString';
+  }
+
+  Set<int> getExistingSignatureIndexes() {
+    final Set<int> existingIndexes = <int>{};
+    String baseName = state.pdfName ?? 'document';
+
+    // Eğer dosya adında "_imzalandi_" varsa, mevcut imzaları çıkar
+    if (baseName.contains('_imzalandi_')) {
+      final index = baseName.indexOf('_imzalandi_');
+      final indexPart = baseName.substring(index + '_imzalandi_'.length);
+
+      // Mevcut indexleri parse et (örn: "13" → [1, 3])
+      for (int i = 0; i < indexPart.length; i++) {
+        final digit = int.tryParse(indexPart[i]);
+        if (digit != null && digit >= 1 && digit <= 4) {
+          existingIndexes.add(digit);
+        }
+      }
+    }
+
+    return existingIndexes;
   }
 }

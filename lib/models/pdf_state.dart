@@ -10,6 +10,7 @@ class PdfState {
   final Map<int, Size> pageSizes;
   final Map<int, Uint8List?> renderedImages;
   final bool isLoading;
+  final String? pdfName;
 
   const PdfState({
     this.document,
@@ -19,6 +20,7 @@ class PdfState {
     this.pageSizes = const {},
     this.renderedImages = const {},
     this.isLoading = false,
+    this.pdfName,
   });
 
   PdfState copyWith({
@@ -29,6 +31,7 @@ class PdfState {
     Map<int, Size>? pageSizes,
     Map<int, Uint8List?>? renderedImages,
     bool? isLoading,
+    String? pdfName,
     bool? Function()? documentClear,
   }) =>
       PdfState(
@@ -41,5 +44,6 @@ class PdfState {
         pageSizes: pageSizes ?? this.pageSizes,
         renderedImages: renderedImages ?? this.renderedImages,
         isLoading: isLoading ?? this.isLoading,
+        pdfName: pdfName ?? this.pdfName,
       );
 }
