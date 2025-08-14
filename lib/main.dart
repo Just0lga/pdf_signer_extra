@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/date_symbol_data_local.dart'; // Eklendi
+import 'package:pdf_signer_extra/screens/login_screen.dart';
 import 'screens/pdf_imza_screen.dart';
 
 void main() async {
@@ -14,7 +15,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) => MaterialApp(
         debugShowCheckedModeBanner: false,
         title: 'PDF İmza',
-        theme: ThemeData(primarySwatch: Colors.blue),
-        home: PdfImzaScreen(),
+        theme: ThemeData(primarySwatch: Colors.cyan),
+        home: LoginScreen(),
       );
 }

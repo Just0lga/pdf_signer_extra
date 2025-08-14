@@ -104,7 +104,7 @@ class _PdfPageWidgetState extends ConsumerState<PdfPageWidget> {
     if (pageSize == null)
       return const Center(
           child: CircularProgressIndicator(
-        color: Colors.blue,
+        color: Color(0xFF5fd8e7),
       ));
 
     return FittedBox(
@@ -114,7 +114,7 @@ class _PdfPageWidgetState extends ConsumerState<PdfPageWidget> {
         height: pageSize.height,
         alignment: Alignment.center,
         child: const CircularProgressIndicator(
-          color: Colors.blue,
+          color: Color(0xFF5fd8e7),
         ),
       ),
     );

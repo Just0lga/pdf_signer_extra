@@ -1,12 +1,13 @@
+import 'dart:convert';
 import 'dart:typed_data';
 import 'dart:io';
 import 'package:ftpconnect/ftpConnect.dart';
+import 'package:pdf_signer_extra/turkish.dart';
 import 'package:syncfusion_flutter_pdf/pdf.dart' as sf;
 import '../models/ftp_file.dart';
-import 'pdf_loader_service.dart'; // Interface'i import et
+import 'pdf_loader_service.dart';
 
 class FtpPdfLoader implements PdfLoaderService {
-  // ✅ Interface'i implement et
   final String host;
   final String username;
   final String password;
@@ -21,92 +22,148 @@ class FtpPdfLoader implements PdfLoaderService {
     this.port = 21,
   });
 
-  @override // ✅ Override annotation'ı ekle
+  @override
   Future<Uint8List?> loadPdf() async {
     FTPConnect? ftpConnect;
     File? tempFile;
 
     try {
-      // FTP bağlantısını kur
-      ftpConnect = FTPConnect(
-        host,
-        user: username,
-        pass: password,
-        port: port,
-        timeout: 60,
-        showLog: false,
-      );
+      ftpConnect = FTPConnect(host,
+          user: username,
+          pass: password,
+          port: port,
+          timeout: 60,
+          showLog: false);
 
-      // Bağlantıyı aç
       bool connected = await ftpConnect.connect();
-      if (!connected) {
-        throw Exception('FTP bağlantısı kurulamadı');
-      }
+      if (!connected) throw Exception('FTP bağlantısı kurulamadı');
 
-      // Binary modda indir (ÖNEMLİ: PDF dosyaları için binary mod şart)
       await ftpConnect.setTransferType(TransferType.binary);
 
-      // Dosya boyutunu al
-      int fileSize = await ftpConnect.sizeFile(filePath);
-      if (fileSize <= 0) {
-        throw Exception('Dosya bulunamadı veya boş: $filePath');
+      String workingPath = filePath;
+      int fileSize = 0;
+
+      if (filePath.contains('/')) {
+        List<String> parts = filePath.split('/');
+        String fileName = parts.last;
+
+        // Gelişmiş Türkçe decoder kullan
+        String decodedFileName =
+            TurkishCharacterDecoder.decodeFileName(fileName);
+
+        // Debug bilgisi
+        print('🔄 Dosya decode: "$fileName" -> "$decodedFileName"');
+        TurkishCharacterDecoder.debugCharacterCodes(fileName);
+
+        List<String> pathsToTry = [
+          filePath, // Orijinal
+          parts.sublist(0, parts.length - 1).join('/') + '/$decodedFileName',
+          parts.sublist(0, parts.length - 1).join('/') +
+              '/${Uri.encodeComponent(decodedFileName)}',
+        ];
+
+        // Gelişmiş encoding varyantları
+        List<String> encodingVariants =
+            _generateAdvancedEncodingVariants(fileName);
+        for (String variant in encodingVariants) {
+          String variantPath =
+              parts.sublist(0, parts.length - 1).join('/') + '/$variant';
+          if (!pathsToTry.contains(variantPath)) {
+            pathsToTry.add(variantPath);
+          }
+        }
+
+        for (String tryPath in pathsToTry) {
+          try {
+            int trySize = await ftpConnect.sizeFile(tryPath);
+            if (trySize > 0) {
+              workingPath = tryPath;
+              fileSize = trySize;
+              print('✅ Çalışan path bulundu: $tryPath ($fileSize bytes)');
+              break;
+            }
+          } catch (e) {
+            print('❌ Path başarısız: $tryPath');
+            continue;
+          }
+        }
+      } else {
+        // Basit dosya adı
+        try {
+          fileSize = await ftpConnect.sizeFile(filePath);
+          if (fileSize > 0) workingPath = filePath;
+        } catch (e) {
+          print('Basit path başarısız: $e');
+        }
       }
 
-      print('İndirilecek dosya boyutu: $fileSize bytes');
+      if (fileSize <= 0) throw Exception('Dosya bulunamadı: $filePath');
 
-      // Geçici dosya oluştur
+      print('📥 İndiriliyor: $workingPath ($fileSize bytes)');
+
       tempFile = await _createTempFile();
+      bool result = await ftpConnect
+          .downloadFileWithRetry(workingPath, tempFile, pRetryCount: 3);
 
-      // Dosyayı retry mekanizması ile indir
-      bool downloadResult =
-          await _downloadWithRetry(ftpConnect, filePath, tempFile, fileSize);
+      if (!result) throw Exception('İndirme başarısız');
 
-      if (!downloadResult) {
-        throw Exception('Dosya indirilemedi');
-      }
-
-      // Dosyayı byte array olarak oku
       Uint8List fileBytes = await tempFile.readAsBytes();
 
-      // Dosya boyutu kontrolü
-      if (fileBytes.length != fileSize) {
-        print(
-            'UYARI: Beklenen boyut: $fileSize, İndirilen boyut: ${fileBytes.length}');
-        throw Exception(
-            'Dosya tamamen indirilemedi. Beklenen: $fileSize, İndirilen: ${fileBytes.length}');
+      // PDF kontrolü
+      if (fileBytes.length < 4 ||
+          String.fromCharCodes(fileBytes.sublist(0, 4)) != '%PDF') {
+        throw Exception('Geçersiz PDF dosyası');
       }
 
-      // PDF doğrulama
-      bool isValidPdf = await verifyPdfFile(fileBytes);
-      if (!isValidPdf) {
-        throw Exception('İndirilen dosya geçerli bir PDF değil');
-      }
-
-      print(
-          'Dosya başarıyla indirildi ve doğrulandı: ${fileBytes.length} bytes');
+      print('✅ PDF başarıyla indirildi: ${fileBytes.length} bytes');
       return fileBytes;
     } catch (e) {
-      print('FTP indirme hatası: $e');
+      print('❌ FTP hatası: $e');
       rethrow;
     } finally {
       try {
         await ftpConnect?.disconnect();
-      } catch (e) {
-        print('FTP bağlantı kesme hatası: $e');
-      }
-
-      // Geçici dosyayı temizle
-      try {
-        if (tempFile != null && await tempFile.exists()) {
+        if (tempFile != null && await tempFile.exists())
           await tempFile.delete();
-        }
       } catch (e) {
-        print('Geçici dosya silme hatası: $e');
+        print('Cleanup hatası: $e');
       }
     }
   }
 
-  // Geçici dosya oluştur
+  // Gelişmiş Türkçe decoder kullan
+  static String _decodeFileName(String fileName) {
+    return TurkishCharacterDecoder.decodeFileName(fileName);
+  }
+
+  // Gelişmiş encoding varyantları oluştur - HIZLI versiyonu
+  static List<String> _generateAdvancedEncodingVariants(
+      String originalFileName) {
+    List<String> variants = [];
+
+    // 1. Orijinal
+    variants.add(originalFileName);
+
+    // 2. Türkçe karakter varsa sadece hızlı decode
+    if (originalFileName.contains(RegExp(r'[çğıöşüÇĞIİÖŞÜ]'))) {
+      String decoded = TurkishCharacterDecoder.decodeFileName(originalFileName);
+      if (decoded != originalFileName) {
+        variants.add(decoded);
+      }
+    }
+
+    // 3. Sadece gerekli durumlarda URL decode
+    if (originalFileName.contains('%')) {
+      try {
+        String urlDecoded = Uri.decodeComponent(originalFileName);
+        variants.add(urlDecoded);
+      } catch (e) {/* ignore */}
+    }
+
+    // Maksimum 4 varyant - gereksiz işlem yok
+    return variants.take(4).toList();
+  }
+
   Future<File> _createTempFile() async {
     final tempDir = Directory.systemTemp;
     final fileName =
@@ -114,71 +171,63 @@ class FtpPdfLoader implements PdfLoaderService {
     return File('${tempDir.path}/$fileName');
   }
 
-  // Retry mekanizması ile indirme
-  Future<bool> _downloadWithRetry(FTPConnect ftpConnect, String remotePath,
-      File localFile, int expectedSize) async {
-    const int maxRetries = 3;
+  // Gelişmiş dosya boyutu alma
+  static Future<int> _getFileSize(
+      FTPConnect ftpConnect, String originalFileName, String directory) async {
+    // Önce basit deneme
+    String simplePath = directory == '/'
+        ? '/$originalFileName'
+        : '$directory/$originalFileName';
 
-    for (int attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      int size = await ftpConnect.sizeFile(simplePath);
+      if (size > 0) {
+        print('✅ Boyut alındı (basit): $simplePath -> $size bytes');
+        return size;
+      }
+    } catch (e) {
+      print('❌ Basit boyut alma başarısız: $simplePath');
+    }
+
+    // Encoding varyantlarını dene
+    List<String> variants = _generateAdvancedEncodingVariants(originalFileName);
+
+    for (String variant in variants) {
+      String path = directory == '/' ? '/$variant' : '$directory/$variant';
       try {
-        print('İndirme denemesi $attempt/$maxRetries');
-
-        // Dosyayı indir
-        bool result = await ftpConnect.downloadFileWithRetry(
-          remotePath,
-          localFile,
-          pRetryCount: 2,
-        );
-
-        if (result) {
-          // Dosya boyutu kontrolü
-          if (await localFile.exists()) {
-            int downloadedSize = await localFile.length();
-            if (downloadedSize == expectedSize) {
-              print('İndirme başarılı: $downloadedSize bytes');
-              return true;
-            } else {
-              print(
-                  'Boyut uyumsuzluğu - deneme $attempt: beklenen $expectedSize, alınan $downloadedSize');
+        // Transfer mode'ları dene
+        for (String mode in ['I', 'A']) {
+          try {
+            await ftpConnect.sendCustomCommand('TYPE $mode');
+            int size = await ftpConnect.sizeFile(path);
+            if (size > 0) {
+              print('✅ Boyut alındı ($mode mode): $path -> $size bytes');
+              return size;
             }
+          } catch (e) {
+            continue;
           }
         }
       } catch (e) {
-        print('İndirme denemesi $attempt başarısız: $e');
-        if (attempt == maxRetries) rethrow;
+        continue;
       }
-
-      // Başarısız indirme durumunda dosyayı sil
-      try {
-        if (await localFile.exists()) {
-          await localFile.delete();
-        }
-      } catch (e) {
-        print('Geçici dosya silme hatası: $e');
-      }
-
-      // Kısa bir bekleme
-      await Future.delayed(Duration(seconds: attempt));
     }
 
-    return false;
+    print('⚠️ Hiçbir yöntemle boyut alınamadı: $originalFileName');
+    return 0;
   }
 
-  // PDF dosya doğrulama fonksiyonu
   static Future<bool> verifyPdfFile(Uint8List bytes) async {
     try {
-      // PDF header kontrolü
       if (bytes.length < 4) return false;
 
       String header = String.fromCharCodes(bytes.sublist(0, 4));
       if (header != '%PDF') return false;
 
-      // PDF footer kontrolü (son 1024 byte'ta %%EOF arayalım)
       int searchStart = bytes.length > 1024 ? bytes.length - 1024 : 0;
       String content = String.fromCharCodes(bytes.sublist(searchStart));
       if (!content.contains('%%EOF')) return false;
 
-      // Syncfusion PDF ile doğrulama
       try {
         final document = sf.PdfDocument(inputBytes: bytes);
         bool isValid = document.pages.count > 0;
@@ -194,7 +243,6 @@ class FtpPdfLoader implements PdfLoaderService {
     }
   }
 
-  // Static metodlar (listeleme ve upload)
   static Future<List<FtpFile>> listPdfFiles({
     required String host,
     required String username,
@@ -204,54 +252,63 @@ class FtpPdfLoader implements PdfLoaderService {
   }) async {
     FTPConnect? ftpConnect;
     try {
-      ftpConnect = FTPConnect(
-        host,
-        user: username,
-        pass: password,
-        port: port,
-        timeout: 30,
-        showLog: false,
-      );
+      ftpConnect = FTPConnect(host,
+          user: username,
+          pass: password,
+          port: port,
+          timeout: 30,
+          showLog: true);
 
       bool connected = await ftpConnect.connect();
-      if (!connected) {
-        throw Exception('FTP bağlantısı kurulamadı');
-      }
+      if (!connected) throw Exception('FTP bağlantısı kurulamadı');
 
-      if (directory != '/') {
-        await ftpConnect.changeDirectory(directory);
-      }
+      if (directory != '/') await ftpConnect.changeDirectory(directory);
 
       List<FTPEntry> entries = await ftpConnect.listDirectoryContent();
+      print('🔍 FTP\'den ${entries.length} dosya bulundu');
+
       List<FtpFile> pdfFiles = [];
 
       for (FTPEntry entry in entries) {
+        print('📄 İşlenen dosya: "${entry.name}" - Type: ${entry.type}');
+
         if (entry.type == FTPEntryType.FILE &&
             entry.name.toLowerCase().endsWith('.pdf')) {
-          String fullPath =
-              directory == '/' ? '/${entry.name}' : '$directory/${entry.name}';
+          // Gelişmiş Türkçe decoder kullan
+          String decodedName =
+              TurkishCharacterDecoder.decodeFileName(entry.name);
+          print('🔄 Decode: "${entry.name}" -> "$decodedName"');
 
-          int? fileSize;
-          try {
-            fileSize = await ftpConnect.sizeFile(fullPath);
-            if (fileSize < 0) fileSize = 0;
-          } catch (e) {
-            print('Dosya boyutu alınamadı ${entry.name}: $e');
-            fileSize = 0;
+          // Debug için karakter kodlarını göster
+          if (entry.name != decodedName) {
+            print('🔍 Orijinal karakter analizi:');
+            TurkishCharacterDecoder.debugCharacterCodes(entry.name);
+            print('🔍 Decode edilmiş karakter analizi:');
+            TurkishCharacterDecoder.debugCharacterCodes(decodedName);
           }
 
+          String originalPath =
+              directory == '/' ? '/${entry.name}' : '$directory/${entry.name}';
+
+          int fileSize = await _getFileSize(ftpConnect, entry.name, directory);
+
           pdfFiles.add(FtpFile(
-            name: entry.name,
-            path: fullPath,
-            size: fileSize ?? 0,
+            name: decodedName, // Decode edilmiş ad göster
+            path: originalPath, // Orijinal path kullan
+            size: fileSize,
             modifyTime: entry.modifyTime,
           ));
+
+          print('✅ PDF eklendi: "$decodedName" (${fileSize} bytes)');
+        } else {
+          print('⏭️ Atlandı: "${entry.name}" - PDF değil veya dosya değil');
         }
       }
 
+      print('🎯 Toplam PDF sayısı: ${pdfFiles.length}');
       return pdfFiles;
     } catch (e) {
-      print('FTP listeleme hatası: $e');
+      print('💥 FTP hatası: $e');
       throw Exception('Dosya listesi alınamadı: $e');
     } finally {
       try {
@@ -297,6 +354,10 @@ class FtpPdfLoader implements PdfLoaderService {
           String fullPath =
               directory == '/' ? '/${entry.name}' : '$directory/${entry.name}';
 
+          // Türkçe karakter decode
+          String decodedName =
+              TurkishCharacterDecoder.decodeFileName(entry.name);
+
           int? fileSize;
           try {
             fileSize = await ftpConnect.sizeFile(fullPath);
@@ -306,7 +367,7 @@ class FtpPdfLoader implements PdfLoaderService {
           }
 
           allFiles.add(FtpFile(
-            name: entry.name,
+            name: decodedName, // Decode edilmiş ad kullan
             path: fullPath,
             size: fileSize ?? 0,
             modifyTime: entry.modifyTime,
@@ -366,8 +427,13 @@ class FtpPdfLoader implements PdfLoaderService {
 
       await ftpConnect.setTransferType(TransferType.binary);
 
+      // Dosya adını uygun encode etmeye çalış
+      String finalFileName = _prepareFileNameForUpload(fileName);
+      print(
+          '🔄 Upload için dosya adı hazırlandı: "$fileName" -> "$finalFileName"');
+
       String filePath =
-          directory == '/' ? '/$fileName' : '$directory/$fileName';
+          directory == '/' ? '/$finalFileName' : '$directory/$finalFileName';
 
       if (!overwrite) {
         try {
@@ -382,25 +448,11 @@ class FtpPdfLoader implements PdfLoaderService {
 
       tempFile = await _createTempFileForUpload(pdfBytes);
 
-      bool uploadResult = await _uploadWithRetry(
+      bool uploadResult = await _uploadWithRetryMultipleEncodings(
           ftpConnect, tempFile, fileName, pdfBytes.length);
 
       if (!uploadResult) {
         throw Exception('Dosya yükleme başarısız');
-      }
-
-      await Future.delayed(Duration(seconds: 1));
-
-      int uploadedSize = await ftpConnect.sizeFile(filePath);
-      if (uploadedSize < 0 || uploadedSize != pdfBytes.length) {
-        print(
-            'UYARI: Yüklenen dosya boyutu eşleşmiyor. Beklenen: ${pdfBytes.length}, Yüklenen: $uploadedSize');
-        try {
-          await ftpConnect.deleteFile(filePath);
-        } catch (e) {
-          print('Bozuk dosya silinemedi: $e');
-        }
-        throw Exception('Yüklenen dosya boyutu eşleşmiyor');
       }
 
       print('Dosya başarıyla yüklendi: $fileName (${pdfBytes.length} bytes)');
@@ -433,13 +485,109 @@ class FtpPdfLoader implements PdfLoaderService {
     return tempFile;
   }
 
+  // HIZLI dosya adı upload hazırlığı - gereksiz işlemleri kaldırdık
+  static String _prepareFileNameForUpload(String fileName) {
+    return fileName.trim(); // Sadece boşluk temizle
+  }
+
+  // HIZLI encoding varyantları - en çok kullanılanları önce
+  static List<String> _generateUploadEncodingVariants(String fileName) {
+    List<String> variants = [];
+
+    // 1. Orijinal dosya adı (en yaygın)
+    variants.add(fileName);
+
+    // 2. Sadece Türkçe karakterler varsa encoding dene
+    if (fileName.contains(RegExp(r'[çğıöşüÇĞIİÖŞÜ]'))) {
+      // UTF-8 → Latin-1 (en hızlı ve yaygın)
+      try {
+        List<int> utf8Bytes = utf8.encode(fileName);
+        String latin1Encoded = latin1.decode(utf8Bytes, allowInvalid: true);
+        if (latin1Encoded != fileName) {
+          variants.add(latin1Encoded);
+        }
+      } catch (e) {/* ignore */}
+
+      // Manuel hızlı mapping (önceden hesaplanmış)
+      String manualEncoded = _fastTurkishEncode(fileName);
+      if (manualEncoded != fileName) {
+        variants.add(manualEncoded);
+      }
+    }
+
+    // 3. Boşluk → alt çizgi (hızlı replace)
+    if (fileName.contains(' ')) {
+      variants.add(fileName.replaceAll(' ', '_'));
+    }
+
+    // Maksimum 4 varyant - daha fazlası gereksiz
+    return variants.take(4).toList();
+  }
+
+  // HIZLI Türkçe karakter encoding - tek geçişte
+  static String _fastTurkishEncode(String input) {
+    if (!input.contains(RegExp(r'[çğıöşüÇĞIİÖŞÜ]'))) {
+      return input; // Türkçe karakter yoksa olduğu gibi döndür
+    }
+
+    // Tek geçişte tüm karakterleri değiştir
+    StringBuffer result = StringBuffer();
+
+    for (int i = 0; i < input.length; i++) {
+      String char = input[i];
+      switch (char) {
+        case 'ğ':
+          result.write('\u00F0');
+          break; // ð
+        case 'Ğ':
+          result.write('\u00D0');
+          break; // Ð
+        case 'ı':
+          result.write('\u00FD');
+          break; // ý
+        case 'İ':
+          result.write('\u00DD');
+          break; // Ý
+        case 'ş':
+          result.write('\u00FE');
+          break; // þ
+        case 'Ş':
+          result.write('\u00DE');
+          break; // Þ
+        case 'ç':
+          result.write('\u00E7');
+          break; // ç
+        case 'Ç':
+          result.write('\u00C7');
+          break; // Ç
+        case 'ö':
+          result.write('\u00F6');
+          break; // ö
+        case 'Ö':
+          result.write('\u00D6');
+          break; // Ö
+        case 'ü':
+          result.write('\u00FC');
+          break; // ü
+        case 'Ü':
+          result.write('\u00DC');
+          break; // Ü
+        default:
+          result.write(char);
+          break;
+      }
+    }
+
+    return result.toString();
+  }
+
   static Future<bool> _uploadWithRetry(FTPConnect ftpConnect, File localFile,
       String remoteName, int expectedSize) async {
     const int maxRetries = 3;
 
     for (int attempt = 1; attempt <= maxRetries; attempt++) {
       try {
-        print('Upload denemesi $attempt/$maxRetries');
+        print('Upload denemesi $attempt/$maxRetries: "$remoteName"');
 
         bool result = await ftpConnect.uploadFileWithRetry(
           localFile,
@@ -453,6 +601,7 @@ class FtpPdfLoader implements PdfLoaderService {
           String remotePath = '/$remoteName';
           int uploadedSize = await ftpConnect.sizeFile(remotePath);
           if (uploadedSize >= 0 && uploadedSize == expectedSize) {
+            print('✅ Upload başarılı: "$remoteName" (${expectedSize} bytes)');
             return true;
           } else {
             print(
@@ -473,5 +622,107 @@ class FtpPdfLoader implements PdfLoaderService {
     }
 
     return false;
+  }
+
+  // HIZLI birden fazla encoding ile upload deneme
+  static Future<bool> _uploadWithRetryMultipleEncodings(FTPConnect ftpConnect,
+      File localFile, String originalFileName, int expectedSize) async {
+    // Hızlı encoding varyantları (maksimum 4 adet)
+    List<String> encodingVariants =
+        _generateUploadEncodingVariants(originalFileName);
+
+    print('🚀 Hızlı upload: ${encodingVariants.length} varyant');
+
+    // Paralel deneme yerine sıralı ama hızlı deneme
+    for (int i = 0; i < encodingVariants.length; i++) {
+      String fileName = encodingVariants[i];
+      print('📤 Upload ${i + 1}/${encodingVariants.length}: "$fileName"');
+
+      try {
+        bool result = await _uploadWithRetry(
+            ftpConnect, localFile, fileName, expectedSize);
+        if (result) {
+          print('✅ Upload başarılı!');
+          return true;
+        }
+      } catch (e) {
+        // Hata durumunda sonraki varyanta geç
+        continue;
+      }
+    }
+
+    return false;
+  }
+
+  // HIZLI upload doğrulama - gereksiz kontroller kaldırıldı
+  static Future<void> _verifyUploadedFileName(
+      FTPConnect ftpConnect, String originalName, String uploadedName) async {
+    // Sadece gerekli durumlarda çalıştır
+    if (originalName == uploadedName) return;
+
+    print('✅ Upload tamamlandı: "$uploadedName"');
+  }
+
+  // BASIT ve HIZLI test fonksiyonu
+  static Future<void> testUploadCharacterSet({
+    required String host,
+    required String username,
+    required String password,
+    int port = 21,
+  }) async {
+    print('🧪 Hızlı karakter seti testi...');
+
+    // Sadece 1 test dosyası - hızlı
+    String testName = 'test_ğüişöç.txt';
+    String testContent = 'Test';
+
+    FTPConnect? ftpConnect;
+    try {
+      ftpConnect = FTPConnect(host, user: username, pass: password, port: port);
+      if (!(await ftpConnect.connect())) throw Exception('Bağlantı hatası');
+
+      File tempFile = await _createTempFileForUpload(utf8.encode(testContent));
+
+      // Sadece 2 varyant dene - hızlı
+      List<String> variants = _generateUploadEncodingVariants(testName);
+
+      for (String variant in variants.take(2)) {
+        try {
+          bool result = await ftpConnect.uploadFileWithRetry(tempFile,
+              pRemoteName: variant);
+          if (result) {
+            print('✅ Çalışan encoding: "$variant"');
+            try {
+              await ftpConnect.deleteFile(variant);
+            } catch (e) {}
+            break;
+          }
+        } catch (e) {
+          continue;
+        }
+      }
+
+      await tempFile.delete();
+    } catch (e) {
+      print('Test hatası: $e');
+    } finally {
+      try {
+        await ftpConnect?.disconnect();
+      } catch (e) {}
+    }
+  }
+
+  // Dosya adı karakter analizi (debugging için)
+  static void analyzeFileName(String fileName) {
+    print('\n🔍 Dosya adı analizi: "$fileName"');
+    TurkishCharacterDecoder.debugCharacterCodes(fileName);
+
+    String decoded = TurkishCharacterDecoder.decodeFileName(fileName);
+    print('✅ Decode sonucu: "$decoded"');
+
+    if (fileName != decoded) {
+      print('🔍 Decode edilmiş karakter analizi:');
+      TurkishCharacterDecoder.debugCharacterCodes(decoded);
+    }
   }
 }

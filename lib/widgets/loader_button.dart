@@ -51,7 +51,7 @@ class LoaderButtons extends ConsumerWidget {
             margin: EdgeInsets.all(8),
             padding: EdgeInsets.symmetric(horizontal: 16, vertical: 16),
             decoration: BoxDecoration(
-              color: Colors.blue,
+              color: Color(0xFF5fd8e7),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Row(

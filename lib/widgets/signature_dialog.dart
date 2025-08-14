@@ -82,7 +82,8 @@ class _SignatureDialogState extends ConsumerState<SignatureDialog> {
           onPressed: () => Navigator.pop(context),
           child: const Text(
             'İptal',
-            style: TextStyle(color: Colors.blue, fontWeight: FontWeight.bold),
+            style: TextStyle(
+                color: Color(0xFF5fd8e7), fontWeight: FontWeight.bold),
           ),
         ),
         TextButton(

@@ -130,7 +130,7 @@ class _FtpBrowserScreenState extends ConsumerState<FtpBrowserScreen> {
         title: const Text('FTP PDF Listesi',
             style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
         iconTheme: IconThemeData(color: Colors.white),
-        backgroundColor: Colors.blue,
+        backgroundColor: Color(0xFF5fd8e7),
         centerTitle: true,
         actions: [
           /*
@@ -154,7 +154,7 @@ class _FtpBrowserScreenState extends ConsumerState<FtpBrowserScreen> {
       body: Column(
         children: [
           Container(
-            color: Colors.blue.withOpacity(0.1),
+            color: Color(0xFF5fd8e7).withOpacity(0.1),
             padding: const EdgeInsets.all(12),
             child: Column(
               children: [
@@ -181,13 +181,13 @@ class _FtpBrowserScreenState extends ConsumerState<FtpBrowserScreen> {
                 const SizedBox(height: 4),
                 Row(
                   children: [
-                    const Icon(Icons.sort, size: 16, color: Colors.blue),
+                    const Icon(Icons.sort, size: 16, color: Color(0xFF5fd8e7)),
                     const SizedBox(width: 4),
                     Text(
                       'Dosyalar tarihe göre sıralandı (En yeni önce)',
                       style: TextStyle(
                         fontSize: 11,
-                        color: Colors.blue[700],
+                        color: Color(0xFF5fd8e7),
                         fontStyle: FontStyle.italic,
                       ),
                     ),
@@ -235,7 +235,7 @@ class _FtpBrowserScreenState extends ConsumerState<FtpBrowserScreen> {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(
               child: CircularProgressIndicator(
-            color: Colors.blue,
+            color: Color(0xFF5fd8e7),
           ));
         }
 
@@ -290,7 +290,7 @@ class _FtpBrowserScreenState extends ConsumerState<FtpBrowserScreen> {
         }
 
         return RefreshIndicator(
-          color: Colors.blue,
+          color: Color(0xFF5fd8e7),
           onRefresh: () async => _connectAndList(),
           child: ListView.builder(
             itemCount: files.length,
@@ -303,7 +303,7 @@ class _FtpBrowserScreenState extends ConsumerState<FtpBrowserScreen> {
                   borderRadius: BorderRadius.circular(8),
                   side: BorderSide(
                     // Kenar çizgisi
-                    color: Colors.blue, // Çizgi rengi
+                    color: Color(0xFF5fd8e7), // Çizgi rengi
                   ),
                 ),
                 margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -331,13 +331,13 @@ class _FtpBrowserScreenState extends ConsumerState<FtpBrowserScreen> {
                                 ),
                                 Text(
                                   'Boyut: ${file.sizeFormatted}',
-                                  style: TextStyle(color: Colors.blue),
+                                  style: TextStyle(color: Color(0xFF5fd8e7)),
                                 ),
                                 if (file.modifyTime != null)
                                   Text(
                                     'Tarih: ${DateFormat('d MMMM y HH:mm', 'tr_TR').format(file.modifyTime!.add(Duration(hours: 3)))}',
                                     style: TextStyle(
-                                      color: Colors.blue,
+                                      color: Color(0xFF5fd8e7),
                                       fontWeight: FontWeight.w500,
                                     ),
                                   ),
@@ -348,7 +348,7 @@ class _FtpBrowserScreenState extends ConsumerState<FtpBrowserScreen> {
                             flex: 2,
                             child: Icon(
                               Icons.picture_as_pdf,
-                              color: Colors.blue,
+                              color: Color(0xFF5fd8e7),
                               size: 36,
                             ),
                           )
@@ -398,7 +398,7 @@ class _FtpBrowserScreenState extends ConsumerState<FtpBrowserScreen> {
           content: Row(
             children: [
               CircularProgressIndicator(
-                color: Colors.blue,
+                color: Color(0xFF5fd8e7),
               ),
               SizedBox(width: 16),
               Text('Test PDF yükleniyor...'),
@@ -470,7 +470,7 @@ class _FtpBrowserScreenState extends ConsumerState<FtpBrowserScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             const CircularProgressIndicator(
-              color: Colors.blue,
+              color: Color(0xFF5fd8e7),
             ),
             const SizedBox(width: 16),
             Expanded(

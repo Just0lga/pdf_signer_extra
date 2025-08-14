@@ -18,9 +18,10 @@ class PdfImzaScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
+        automaticallyImplyLeading: false,
         title: const Text('PDF İmzala',
             style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
-        backgroundColor: Colors.blue,
+        backgroundColor: Color(0xFF5fd8e7),
         iconTheme: IconThemeData(color: Colors.white),
         centerTitle: true,
         actions: _buildActions(context, pdfState, pdfNotifier),
@@ -100,7 +101,7 @@ class PdfImzaScreen extends ConsumerWidget {
             height: 20,
             child: CircularProgressIndicator(
               strokeWidth: 2,
-              valueColor: AlwaysStoppedAnimation<Color>(Colors.blue),
+              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF5fd8e7)),
             ),
           ),
         ),
@@ -110,7 +111,7 @@ class PdfImzaScreen extends ConsumerWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            CircularProgressIndicator(color: Colors.blue),
+            CircularProgressIndicator(color: Color(0xFF5fd8e7)),
             SizedBox(height: 16),
             Text('İşlem yapılıyor...'),
           ],
@@ -137,7 +138,7 @@ class PdfImzaScreen extends ConsumerWidget {
         content: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            CircularProgressIndicator(color: Colors.blue),
+            CircularProgressIndicator(color: Color(0xFF5fd8e7)),
             SizedBox(width: 16),
             Text('PDF kaydediliyor...'),
           ],
@@ -197,7 +198,7 @@ class PdfImzaScreen extends ConsumerWidget {
             content: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                CircularProgressIndicator(color: Colors.blue),
+                CircularProgressIndicator(color: Color(0xFF5fd8e7)),
                 SizedBox(width: 16),
                 Text('FTP\'ye yükleniyor...'),
               ],
